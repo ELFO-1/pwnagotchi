@@ -1,6 +1,9 @@
 # pwnagotchi
 my pwnagotchi setup
 
+
+<img width="1926" height="1440" alt="grafik" src="https://github.com/user-attachments/assets/6313ce81-98ba-4fea-a443-324564c6c2fc" />
+
 img from https://github.com/jayofelony/pwnagotchi
 wiki : https://github.com/jayofelony/pwnagotchi/wiki
 
