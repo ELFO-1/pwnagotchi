@@ -74,8 +74,27 @@ trust <your-phone-mac>
 and disable the plugin fix_services bec its only for internal
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-wifi_handshake_analyzer
+for external wifi :
+sudo nano /boot/firmware/config.txt
+remove # from #dtoverlay=disable-wifi
+if not there then add under all :
 
+for the Alfa Awus036ACS ( i get from here : https://github.com/lwfinger/rtw88 )
+
+sudo apt update
+sudo apt install -y raspberrypi-kernel-headers build-essential git
+cd /
+git clone https://github.com/lwfinger/rtw88
+cd rtw88
+sudo dkms install $PWD
+sudo make install_fw
+
+
+#####################################################################################################
+
+
+wifi_handshake_analyzer
+*************************
 i made so i see what tool i can see what handshakes are valid and it showes me the command so i can copy paste and only change the path to the wordlist i want use  :)
 chmod +x wifi_handshake_analyzer.py
 ./wifi_handshake_analyzer.py /path/to/your/captures/
