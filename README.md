@@ -1,5 +1,5 @@
 # pwnagotchi
-my pwnagotchi setup  (use at u own risk .. bec its made for myself)
+my pwnagotchi setup rasp 3b+ with a 3.5 LCD display und custom Face  (use at u own risk .. bec its made for myself)
 
 
 <img width="1926" height="1440" alt="grafik" src="https://github.com/user-attachments/assets/6313ce81-98ba-4fea-a443-324564c6c2fc" />
@@ -56,6 +56,17 @@ sudo nano /boot/firmware/config.txt
 uncomment or add under [all] 
 dtoverlay=disable-wifi
 
+for the Alfa Awus036ACS ( i get from here : https://github.com/lwfinger/rtw88 )
+
+sudo apt update
+sudo apt install -y raspberrypi-kernel-headers build-essential git
+cd /
+git clone https://github.com/lwfinger/rtw88
+cd rtw88
+sudo dkms install $PWD
+sudo make install_fw
+
+
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 bluethooth
 
@@ -74,20 +85,7 @@ trust <your-phone-mac>
 and disable the plugin fix_services bec its only for internal
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-for external wifi :
-sudo nano /boot/firmware/config.txt
-remove # from #dtoverlay=disable-wifi
-if not there then add under all :
 
-for the Alfa Awus036ACS ( i get from here : https://github.com/lwfinger/rtw88 )
-
-sudo apt update
-sudo apt install -y raspberrypi-kernel-headers build-essential git
-cd /
-git clone https://github.com/lwfinger/rtw88
-cd rtw88
-sudo dkms install $PWD
-sudo make install_fw
 
 
 #####################################################################################################
