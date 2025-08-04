@@ -1,5 +1,5 @@
 # pwnagotchi
-my pwnagotchi setup
+my pwnagotchi setup  (use at u own risk .. bec its made for myself)
 
 
 <img width="1926" height="1440" alt="grafik" src="https://github.com/user-attachments/assets/6313ce81-98ba-4fea-a443-324564c6c2fc" />
