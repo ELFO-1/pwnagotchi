@@ -1,4 +1,4 @@
-wifi_handshake_analyzer
+# wifi_handshake_analyzer
 
 i made so i see what tool i can see what handshakes are valid and it showes me the command so i can copy paste and only change the path to the wordlist i want use :) chmod +x wifi_handshake_analyzer.py ./wifi_handshake_analyzer.py /path/to/your/captures/
 
