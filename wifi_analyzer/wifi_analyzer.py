@@ -3,6 +3,7 @@
 WiFi Capture File Analyzer
 Checks .cap/.pcap files for compatibility with aircrack-ng, hashcat, and cowpatty
 """
+# by Elfo
 
 import os
 import subprocess
@@ -10,15 +11,19 @@ import re
 import argparse
 from pathlib import Path
 
+
 def run_command(cmd):
     """Run a command and return output, error, and return code"""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=30
+        )
         return result.stdout, result.stderr, result.returncode
     except subprocess.TimeoutExpired:
         return "", "Command timed out", 1
     except Exception as e:
         return "", str(e), 1
+
 
 def check_aircrack(file_path):
     """Check if file is valid for aircrack-ng"""
@@ -26,13 +31,17 @@ def check_aircrack(file_path):
     stdout, stderr, returncode = run_command(cmd)
 
     # Look for handshake count in output
-    handshake_match = re.search(r'WPA.*\((\d+)\s+handshake', stdout)
+    handshake_match = re.search(r"WPA.*\((\d+)\s+handshake", stdout)
     if handshake_match and int(handshake_match.group(1)) > 0:
         # Extract BSSID for command
-        bssid_match = re.search(r'([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2})', stdout)
+        bssid_match = re.search(
+            r"([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2})",
+            stdout,
+        )
         bssid = bssid_match.group(1) if bssid_match else "BSSID_HERE"
         return True, f'aircrack-ng -w wordlist.txt -b {bssid} "{file_path}"'
     return False, None
+
 
 def check_hashcat(file_path):
     """Check if file can be converted for hashcat"""
@@ -44,7 +53,7 @@ def check_hashcat(file_path):
     if returncode == 0 and os.path.exists(temp_hc):
         # Check if the converted file has content
         try:
-            with open(temp_hc, 'r') as f:
+            with open(temp_hc, "r") as f:
                 content = f.read().strip()
             if content:
                 hashcat_cmd = f'hashcat -m 22000 "{temp_hc}" wordlist.txt'
@@ -58,16 +67,21 @@ def check_hashcat(file_path):
 
     return False, None
 
+
 def check_cowpatty(file_path):
     """Check if file is valid for cowpatty"""
     cmd = f'cowpatty -r "{file_path}" -f /dev/null'
     stdout, stderr, returncode = run_command(cmd)
 
     # Cowpatty will complain about missing dictionary but if file is valid, it won't error about the cap file
-    if "invalid capture file" not in stderr.lower() and "no valid packets" not in stderr.lower():
+    if (
+        "invalid capture file" not in stderr.lower()
+        and "no valid packets" not in stderr.lower()
+    ):
         if "specify dictionary file" in stderr.lower() or returncode == 1:
             return True, f'cowpatty -r "{file_path}" -f wordlist.txt -s ESSID_HERE'
     return False, None
+
 
 def get_file_info(file_path):
     """Get basic info about the capture file"""
@@ -77,16 +91,17 @@ def get_file_info(file_path):
     info = {}
     if returncode == 0:
         # Extract packet count
-        packet_match = re.search(r'Number of packets:\s+(\d+)', stdout)
+        packet_match = re.search(r"Number of packets:\s+(\d+)", stdout)
         if packet_match:
-            info['packets'] = int(packet_match.group(1))
+            info["packets"] = int(packet_match.group(1))
 
         # Extract file size
-        size_match = re.search(r'File size:\s+(\d+)', stdout)
+        size_match = re.search(r"File size:\s+(\d+)", stdout)
         if size_match:
-            info['size'] = int(size_match.group(1))
+            info["size"] = int(size_match.group(1))
 
     return info
+
 
 def analyze_capture_files(folder_path, delete_unusable=False, verbose=False):
     """Analyze all capture files in a folder"""
@@ -115,7 +130,9 @@ def analyze_capture_files(folder_path, delete_unusable=False, verbose=False):
         if verbose:
             info = get_file_info(str(file_path))
             if info:
-                print(f"   📊 Packets: {info.get('packets', 'Unknown')}, Size: {info.get('size', 'Unknown')} bytes")
+                print(
+                    f"   📊 Packets: {info.get('packets', 'Unknown')}, Size: {info.get('size', 'Unknown')} bytes"
+                )
 
         # Check with different tools
         tools_working = []
@@ -128,14 +145,22 @@ def analyze_capture_files(folder_path, delete_unusable=False, verbose=False):
             commands.append(f"   💻 aircrack-ng: {aircrack_cmd}")
 
         # Check hashcat (only if hcxpcapngtool is available)
-        if subprocess.run("which hcxpcapngtool", shell=True, capture_output=True).returncode == 0:
+        if (
+            subprocess.run(
+                "which hcxpcapngtool", shell=True, capture_output=True
+            ).returncode
+            == 0
+        ):
             hashcat_valid, hashcat_cmd = check_hashcat(str(file_path))
             if hashcat_valid:
                 tools_working.append("hashcat")
                 commands.append(f"   💻 hashcat: {hashcat_cmd}")
 
         # Check cowpatty
-        if subprocess.run("which cowpatty", shell=True, capture_output=True).returncode == 0:
+        if (
+            subprocess.run("which cowpatty", shell=True, capture_output=True).returncode
+            == 0
+        ):
             cowpatty_valid, cowpatty_cmd = check_cowpatty(str(file_path))
             if cowpatty_valid:
                 tools_working.append("cowpatty")
@@ -180,11 +205,16 @@ def analyze_capture_files(folder_path, delete_unusable=False, verbose=False):
         else:
             print(f"\n💡 To delete invalid files, run with --delete flag")
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Analyze WiFi capture files for compatibility with cracking tools")
+    parser = argparse.ArgumentParser(
+        description="Analyze WiFi capture files for compatibility with cracking tools"
+    )
     parser.add_argument("folder", help="Folder containing .cap/.pcap files")
     parser.add_argument("--delete", action="store_true", help="Delete unusable files")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed file information")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show detailed file information"
+    )
 
     args = parser.parse_args()
 
@@ -193,6 +223,7 @@ def main():
         return
 
     analyze_capture_files(args.folder, args.delete, args.verbose)
+
 
 if __name__ == "__main__":
     main()
