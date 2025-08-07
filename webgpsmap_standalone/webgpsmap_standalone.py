@@ -6,7 +6,10 @@ Inklusive Unterstützung für .potfile-Passwörter und Filteroptionen.
 
 Basiert auf dem originalen webgpsmap Plugin von xenDE und dadav
 Erweitert und umgeschrieben für standalone Nutzung ohne Pwnagotchi
+
+modifiziert und erweitert @ Elfo
 """
+
 
 import os
 import json
