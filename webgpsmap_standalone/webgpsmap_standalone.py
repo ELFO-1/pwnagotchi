@@ -6,10 +6,7 @@ Inklusive Unterstützung für .potfile-Passwörter und Filteroptionen.
 
 Basiert auf dem originalen webgpsmap Plugin von xenDE und dadav
 Erweitert und umgeschrieben für standalone Nutzung ohne Pwnagotchi
-
-modifiziert und erweitert @ Elfo
 """
-
 
 import os
 import json
@@ -34,25 +31,18 @@ class WebGPSMapStandalone:
         self.handshakes_dir = handshakes_dir
         self.ALREADY_SENT = list()
         self.SKIP = list()
-        self.cracked_passwords = (
-            self._load_cracked_passwords()
-        )  # Lade Passwörter beim Start
-
-    def normalize_ssid(self, ssid):
-        import re
-
-        return re.sub(r"[^a-zA-Z0-9]", "", ssid).lower()
+        self.cracked_passwords = self._load_cracked_passwords()  # Lade Passwörter beim Start
 
         # Prüfe ob Verzeichnis existiert
         if not os.path.exists(handshakes_dir):
-            raise ValueError(
-                f"Handshakes-Verzeichnis existiert nicht: {handshakes_dir}"
-            )
+            raise ValueError(f"Handshakes-Verzeichnis existiert nicht: {handshakes_dir}")
 
         logging.info(f"[webgpsmap] Handshakes-Verzeichnis: {handshakes_dir}")
-        logging.info(
-            f"[webgpsmap] Geladene Passwörter aus Potfiles: {len(self.cracked_passwords)}"
-        )
+        logging.info(f"[webgpsmap] Geladene Passwörter aus Potfiles: {len(self.cracked_passwords)}")
+
+    def normalize_ssid(self, ssid):
+        import re
+        return re.sub(r"[^a-zA-Z0-9]", "", ssid).lower()
 
     # cache 2048 items
     @lru_cache(maxsize=2048, typed=False)
@@ -62,7 +52,7 @@ class WebGPSMapStandalone:
     def _load_cracked_passwords(self):
         """
         Lädt Passwörter aus den verschiedenen .potfile-Dateien.
-        Gibt ein Dictionary zurück: { "BSSID_SSID": {"password": "...", "source": "..."} }
+        Gibt ein Dictionary zurück: { "BSSID_SSID": {"password": "...", "source": "...", "sources": ["..."]} }
         """
         cracked_data = {}
         potfiles = {
@@ -75,40 +65,43 @@ class WebGPSMapStandalone:
             filepath = os.path.join(self.handshakes_dir, filename)
             if os.path.exists(filepath):
                 logging.info(f"[webgpsmap] Lade Passwörter aus {filename}...")
+                logging.debug(f"[webgpsmap] Quelle: {source_name}")
                 try:
                     with open(filepath, "r", errors="ignore") as f:
                         for line in f:
                             line = line.strip()
                             if not line:
                                 continue
-
                             parts = line.split(":")
-
                             if source_name == "wpa-sec" and len(parts) >= 4:
+                                # robust von rechts lesen und ESSID/Passwort am Ende nehmen
                                 bssid = parts[0].replace(":", "").upper()
-                                essid = parts[2]
-                                password = parts[3]
-                            elif (
-                                source_name == "pwncrack"
-                                or source_name == "remote_cracking"
-                            ) and len(parts) >= 5:
+                                essid = parts[-2]
+                                password = parts[-1]
+                                if essid == "":
+                                    logging.debug(f"Skipping empty ESSID in {filename}: {line}")
+                                    continue
+                            elif (source_name == "pwncrack" or source_name == "remote_cracking") and len(parts) >= 5:
                                 bssid = parts[1].replace(":", "").upper()
                                 essid = parts[3]
                                 password = parts[4]
                             else:
-                                logging.debug(
-                                    f"Skipping malformed line in {filename}: {line}"
-                                )
+                                logging.debug(f"Skipping malformed line in {filename}: {line}")
                                 continue
 
                             key = f"{bssid.lower()}_{self.normalize_ssid(essid)}"
-                            if (
-                                key not in cracked_data
-                            ):  # Nur das erste gefundene Passwort speichern
-                                cracked_data[key] = {
-                                    "password": password,
-                                    "source": source_name,
-                                }
+                            if key not in cracked_data:
+                                cracked_data[key] = {"password": password, "source": source_name, "sources": [source_name]}
+                            else:
+                                # Quelle(n) zusammenführen; Passwort-Konflikte protokollieren
+                                existing = cracked_data[key]
+                                if password != existing["password"]:
+                                    logging.warning(f"[webgpsmap] Passwort-Konflikt für {key}: '{existing['password']}' vs '{password}' (behalte erstes)")
+                                if source_name not in existing.get("sources", []):
+                                    existing.setdefault("sources", []).append(source_name)
+                                # Quelle setzen: wenn identisch, lassen; sonst 'mixed'
+                                if existing.get("source") != source_name:
+                                    existing["source"] = "mixed"
                 except Exception as e:
                     logging.error(f"[webgpsmap] Fehler beim Laden von {filename}: {e}")
             else:
@@ -145,28 +138,6 @@ class WebGPSMapStandalone:
 
             if filename_position is not None:
                 all_geo_or_gps_files.append(filename_position)
-        # DEBUG: Zeige alle Keys aus Potfiles
-        # logging.info(f"[DEBUG] Potfile-Keys: {list(self.cracked_passwords.keys())}")
-
-        # DEBUG: Zeige alle Keys aus GPS-Files
-        gps_keys = []
-        for pos_file in all_geo_or_gps_files:
-            try:
-                pos = self._get_pos_from_file(pos_file)
-                ssid, mac = pos.ssid(), pos.mac()
-                if not mac:
-                    continue
-                gps_key = f"{mac.lower()}_{ssid}"
-                gps_keys.append(gps_key)
-            except Exception as e:
-                continue
-        # logging.info(f"[DEBUG] GPS-Keys: {gps_keys}")
-
-        # DEBUG: Zeige gematchte Keys
-        # matched = [k for k in gps_keys if k in self.cracked_passwords]
-        #  unmatched = [k for k in gps_keys if k not in self.cracked_passwords]
-        # logging.info(f"[DEBUG] Gematchte Keys: {matched}")
-        # logging.info(f"[DEBUG] Nicht gematchte Keys: {unmatched}")
 
         if newest_only:
             all_geo_or_gps_files = set(all_geo_or_gps_files) - set(self.ALREADY_SENT)
@@ -209,15 +180,15 @@ class WebGPSMapStandalone:
                     "ts_last": pos.timestamp_last(),
                     "pass": None,
                     "pass_source": None,
+                    "sources": None,
                 }
 
                 # Check for cracked password from potfiles
                 cracked_key = f"{mac.lower()}_{self.normalize_ssid(ssid)}"
                 if cracked_key in self.cracked_passwords:
                     ap_data["pass"] = self.cracked_passwords[cracked_key]["password"]
-                    ap_data["pass_source"] = self.cracked_passwords[cracked_key][
-                        "source"
-                    ]
+                    ap_data["pass_source"] = self.cracked_passwords[cracked_key]["source"]
+                    ap_data["sources"] = self.cracked_passwords[cracked_key].get("sources", [])
 
                 gps_data[ssid + "_" + mac] = ap_data
 
@@ -395,10 +366,14 @@ class WebGPSMapStandalone:
                 // SSID Search
                 if (ssidSearch && !pos.ssid.toLowerCase().includes(ssidSearch)) return false;
 
-                // Source Filter
+                // Source Filter - Updated to handle multiple sources
                 if (sourceFilter !== 'all') {
-                    if (sourceFilter === 'none' && pos.pass) return false; // If 'none' selected, hide cracked
-                    if (sourceFilter !== 'none' && pos.pass_source !== sourceFilter) return false; // If specific source, match it
+                    if (sourceFilter === 'none') {
+                        if (pos.pass) return false; // Only show uncracked
+                    } else {
+                        const sources = Array.isArray(pos.sources) ? pos.sources : (pos.pass_source ? [pos.pass_source] : []);
+                        if (!sources.includes(sourceFilter)) return false; // Match against sources list
+                    }
                 }
 
                 return true;
@@ -421,15 +396,19 @@ class WebGPSMapStandalone:
                 }).addTo(map);
 
                 var popupContent = '<b>' + pos.ssid + '</b><br>' +
-                                 'MAC: ' + pos.mac + '<br>' +
-                                 'Typ: ' + pos.type + '<br>' +
-                                 'Genauigkeit: ' + (pos.acc ? pos.acc.toFixed(2) : 'N/A') + 'm<br>' +
-                                 'Zuerst gesehen: ' + new Date(pos.ts_first * 1000).toLocaleString() + '<br>' +
-                                 'Zuletzt gesehen: ' + new Date(pos.ts_last * 1000).toLocaleString();
+                    'MAC: ' + pos.mac + '<br>' +
+                    'Typ: ' + pos.type + '<br>' +
+                    'Genauigkeit: ' + (pos.acc ? pos.acc.toFixed(2) : 'N/A') + 'm<br>' +
+                    'Zuerst gesehen: ' + new Date(pos.ts_first * 1000).toLocaleString() + '<br>' +
+                    'Zuletzt gesehen: ' + new Date(pos.ts_last * 1000).toLocaleString();
 
                 if (pos.pass) {
                     popupContent += '<br><b>Passwort: ' + pos.pass + '</b>';
-                    popupContent += '<br>Quelle: ' + pos.pass_source;
+                    if (Array.isArray(pos.sources) && pos.sources.length > 0) {
+                        popupContent += '<br>Quellen: ' + pos.sources.join(', ');
+                    } else if (pos.pass_source) {
+                        popupContent += '<br>Quelle: ' + pos.pass_source;
+                    }
                 }
 
                 marker.bindPopup(popupContent);
@@ -535,7 +514,7 @@ class PositionFile:
         """
         returns the password from file.pcap.cracked or None
         (This function is mostly for legacy .pcap.cracked files,
-         passwords are now primarily loaded from .potfiles)
+        passwords are now primarily loaded from .potfiles)
         """
         return_pass = None
         # This part is less relevant now as potfiles are preferred
